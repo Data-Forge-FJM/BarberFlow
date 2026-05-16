@@ -1,0 +1,109 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Get a free hosted Postgres database in seconds: `npx create-db`
+
+
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+model Cliente {
+
+  id         Int      @id @default(autoincrement())
+
+  fullName   String
+  email      String   @unique
+  phone      String?
+
+  isActive   Boolean  @default(true)
+
+  createdAt  DateTime @default(now())
+
+  reservas   Reserva[]
+}
+
+model Servicio {
+
+  id           Int      @id @default(autoincrement())
+
+  nombre       String
+  duracion     Int
+  precio       Float
+
+  descripcion  String?
+
+  createdAt    DateTime @default(now())
+
+  reservas     Reserva[]
+}
+
+model Barbero {
+
+  id            Int       @id @default(autoincrement())
+
+  nombre        String
+
+  especialidad  String?
+
+  telefono      String? @unique
+
+  disponible    Boolean   @default(true)
+
+  createdAt     DateTime  @default(now())
+
+  horarios      Horario[]
+
+  reservas      Reserva[]
+}
+
+model Horario {
+
+  id           Int       @id @default(autoincrement())
+
+  dia          String
+
+  horaInicio   String
+
+  horaFin      String
+
+  disponible   Boolean   @default(true)
+
+  createdAt    DateTime  @default(now())
+
+  barberoId    Int
+
+  barbero Barbero @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+}
+
+model Reserva {
+
+  id           Int       @id @default(autoincrement())
+
+  dia String?
+
+  fecha        String
+
+  hora         String
+
+  estado       String
+
+  createdAt    DateTime  @default(now())
+
+  // RELACIONES
+
+  clienteId    Int
+  servicioId   Int
+  barberoId    Int
+
+cliente Cliente @relation(fields: [clienteId], references: [id], onDelete: Cascade)
+
+ servicio Servicio @relation(fields: [servicioId], references: [id], onDelete: Cascade)
+
+ barbero Barbero @relation(fields: [barberoId], references: [id], onDelete: Cascade)
+}
