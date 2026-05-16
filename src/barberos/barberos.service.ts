@@ -1,41 +1,60 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateBarberoDto } from './dto/create-barbero.dto';
 import { UpdateBarberoDto } from './dto/update-barbero.dto';
 
-import { Barbero } from './entities/barbero.entity';
-
 @Injectable()
 export class BarberosService {
 
-  private barberos: Barbero[] = [];
-  private nextId = 1;
+  constructor(
+    private readonly prisma: PrismaService,
+  ) { }
 
-  create(dto: CreateBarberoDto): Barbero {
+  async create(dto: CreateBarberoDto) {
 
-    const nuevoBarbero: Barbero = {
-      id: this.nextId++,
-      nombre: dto.nombre,
-      especialidad: dto.especialidad,
-      telefono: dto.telefono,
-      disponible: dto.disponible,
-      createdAt: new Date().toISOString(),
-    };
+    const existeBarbero =
+      await this.prisma.barbero.findUnique({
+        where: {
+          telefono: dto.telefono!,
+        },
+      });
 
-    this.barberos.push(nuevoBarbero);
+    if (existeBarbero) {
+      throw new BadRequestException(
+        'Ya existe un barbero con ese teléfono',
+      );
+    }
 
-    return nuevoBarbero;
+    return this.prisma.barbero.create({
+      data: {
+        nombre: dto.nombre,
+        especialidad: dto.especialidad,
+        telefono: dto.telefono!,
+        disponible: dto.disponible,
+      },
+    });
   }
 
-  findAll(): Barbero[] {
-    return this.barberos;
+  async findAll() {
+
+    return this.prisma.barbero.findMany({
+      orderBy: {
+        id: 'asc',
+      },
+    });
   }
 
-  findOne(id: number): Barbero {
+  async findOne(id: number) {
 
-    const barbero = this.barberos.find(
-      b => b.id === id,
-    );
+    const barbero =
+      await this.prisma.barbero.findUnique({
+        where: { id },
+      });
 
     if (!barbero) {
       throw new NotFoundException(
@@ -46,30 +65,25 @@ export class BarberosService {
     return barbero;
   }
 
-  update(
+  async update(
     id: number,
     dto: UpdateBarberoDto,
-  ): Barbero {
+  ) {
 
-    const barbero = this.findOne(id);
+    await this.findOne(id);
 
-    Object.assign(barbero, dto);
-
-    return barbero;
+    return this.prisma.barbero.update({
+      where: { id },
+      data: dto,
+    });
   }
 
-  remove(id: number): void {
+  async remove(id: number) {
 
-    const index = this.barberos.findIndex(
-      b => b.id === id,
-    );
+    await this.findOne(id);
 
-    if (index === -1) {
-      throw new NotFoundException(
-        `Barbero ${id} no existe`,
-      );
-    }
-
-    this.barberos.splice(index, 1);
+    return this.prisma.barbero.delete({
+      where: { id },
+    });
   }
 }

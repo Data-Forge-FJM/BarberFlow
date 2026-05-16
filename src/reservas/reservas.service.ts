@@ -4,26 +4,58 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 
+import { PrismaService } from '../prisma/prisma.service';
+
 import { CreateReservaDto } from './dto/create-reserva.dto';
 import { UpdateReservaDto } from './dto/update-reserva.dto';
-
-import { Reserva } from './entities/reserva.entity';
 
 @Injectable()
 export class ReservasService {
 
-  private reservas: Reserva[] = [];
-  private nextId = 1;
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  create(dto: CreateReservaDto): Reserva {
+  async create(dto: CreateReservaDto) {
+
+    // BUSCAR HORARIO DEL BARBERO
+
+const horario =
+  await this.prisma.horario.findFirst({
+    where: {
+      barberoId: dto.barberoId,
+      dia: dto.dia,
+      disponible: true,
+    },
+  });
+
+if (!horario) {
+  throw new BadRequestException(
+    'El barbero no tiene horarios configurados',
+  );
+}
+
+// VALIDAR HORA DENTRO DEL RANGO
+
+if (
+  dto.hora < horario.horaInicio ||
+  dto.hora > horario.horaFin
+) {
+  throw new BadRequestException(
+    'La hora está fuera del horario del barbero',
+  );
+}
 
     // VALIDAR RESERVA DUPLICADA
-    const existeReserva = this.reservas.find(
-      r =>
-        r.barberoId === dto.barberoId &&
-        r.fecha === dto.fecha &&
-        r.hora === dto.hora,
-    );
+
+    const existeReserva =
+      await this.prisma.reserva.findFirst({
+        where: {
+          barberoId: dto.barberoId,
+          fecha: dto.fecha,
+          hora: dto.hora,
+        },
+      });
 
     if (existeReserva) {
       throw new BadRequestException(
@@ -31,31 +63,48 @@ export class ReservasService {
       );
     }
 
-    const nuevaReserva: Reserva = {
-      id: this.nextId++,
-      clienteId: dto.clienteId,
-      servicioId: dto.servicioId,
-      barberoId: dto.barberoId,
-      fecha: dto.fecha,
-      hora: dto.hora,
-      estado: dto.estado,
-      createdAt: new Date().toISOString(),
-    };
+    return this.prisma.reserva.create({
+      data: {
+        fecha: dto.fecha,
+        hora: dto.hora,
+        estado: dto.estado,
 
-    this.reservas.push(nuevaReserva);
-
-    return nuevaReserva;
+        clienteId: dto.clienteId,
+        servicioId: dto.servicioId,
+        barberoId: dto.barberoId,
+      },
+    });
   }
 
-  findAll(): Reserva[] {
-    return this.reservas;
+  async findAll() {
+
+    return this.prisma.reserva.findMany({
+
+      include: {
+        cliente: true,
+        servicio: true,
+        barbero: true,
+      },
+
+      orderBy: {
+        id: 'asc',
+      },
+    });
   }
 
-  findOne(id: number): Reserva {
+  async findOne(id: number) {
 
-    const reserva = this.reservas.find(
-      r => r.id === id,
-    );
+    const reserva =
+      await this.prisma.reserva.findUnique({
+
+        where: { id },
+
+        include: {
+          cliente: true,
+          servicio: true,
+          barbero: true,
+        },
+      });
 
     if (!reserva) {
       throw new NotFoundException(
@@ -66,30 +115,26 @@ export class ReservasService {
     return reserva;
   }
 
-  update(
+  async update(
     id: number,
     dto: UpdateReservaDto,
-  ): Reserva {
+  ) {
 
-    const reserva = this.findOne(id);
+    await this.findOne(id);
 
-    Object.assign(reserva, dto);
+    return this.prisma.reserva.update({
+      where: { id },
 
-    return reserva;
+      data: dto,
+    });
   }
 
-  remove(id: number): void {
+  async remove(id: number) {
 
-    const index = this.reservas.findIndex(
-      r => r.id === id,
-    );
+    await this.findOne(id);
 
-    if (index === -1) {
-      throw new NotFoundException(
-        `Reserva ${id} no existe`,
-      );
-    }
-
-    this.reservas.splice(index, 1);
+    return this.prisma.reserva.delete({
+      where: { id },
+    });
   }
 }

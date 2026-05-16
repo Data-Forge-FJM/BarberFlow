@@ -25,4 +25,8 @@ export class CreateReservaDto {
 
   @IsString()
   estado: string;
+
+  @IsString()
+  dia: string;
+
 }

@@ -1,62 +1,75 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service';
+
 import { CreateClienteDto } from './dto/create-cliente.dto';
 import { UpdateClienteDto } from './dto/update-cliente.dto';
-import { Cliente } from './entities/cliente.entity';
 
 @Injectable()
 export class ClientesService {
 
-  private clientes: Cliente[] = [];
-  private nextId = 1;
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  create(dto: CreateClienteDto): Cliente {
+  async create(dto: CreateClienteDto) {
 
-    const newCliente: Cliente = {
-      id: this.nextId++,
-      fullName: dto.fullName,
-      email: dto.email,
-      phone: dto.phone,
-      isActive: true,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.clientes.push(newCliente);
-
-    return newCliente;
+    return this.prisma.cliente.create({
+      data: {
+        fullName: dto.fullName,
+        email: dto.email,
+        phone: dto.phone,
+      },
+    });
   }
 
-  findAll(): Cliente[] {
-    return this.clientes;
+  async findAll() {
+
+    return this.prisma.cliente.findMany({
+      orderBy: {
+        id: 'asc',
+      },
+    });
   }
 
-  findOne(id: number): Cliente {
+  async findOne(id: number) {
 
-    const found = this.clientes.find(c => c.id === id);
+    const cliente =
+      await this.prisma.cliente.findUnique({
+        where: { id },
+      });
 
-    if (!found) {
-      throw new NotFoundException(`Cliente ${id} no existe`);
+    if (!cliente) {
+      throw new NotFoundException(
+        `Cliente ${id} no existe`,
+      );
     }
-
-    return found;
-  }
-
-  update(id: number, dto: UpdateClienteDto): Cliente {
-
-    const cliente = this.findOne(id);
-
-    Object.assign(cliente, dto);
 
     return cliente;
   }
 
-  remove(id: number): void {
+  async update(
+    id: number,
+    dto: UpdateClienteDto,
+  ) {
 
-    const idx = this.clientes.findIndex(c => c.id === id);
+    await this.findOne(id);
 
-    if (idx === -1) {
-      throw new NotFoundException(`Cliente ${id} no existe`);
-    }
+    return this.prisma.cliente.update({
+      where: { id },
+      data: dto,
+    });
+  }
 
-    this.clientes.splice(idx, 1);
+  async remove(id: number) {
+
+    await this.findOne(id);
+
+    return this.prisma.cliente.delete({
+      where: { id },
+    });
   }
 }

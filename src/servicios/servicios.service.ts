@@ -1,63 +1,76 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateServicioDto } from './dto/create-servicio.dto';
 import { UpdateServicioDto } from './dto/update-servicio.dto';
-import { Servicio } from './entities/servicio.entity';
 
 @Injectable()
 export class ServiciosService {
 
-  private servicios: Servicio[] = [];
-  private nextId = 1;
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  create(dto: CreateServicioDto): Servicio {
+  async create(dto: CreateServicioDto) {
 
-    const nuevoServicio: Servicio = {
-      id: this.nextId++,
-      nombre: dto.nombre,
-      duracion: dto.duracion,
-      precio: dto.precio,
-      descripcion: dto.descripcion,
-      createdAt: new Date().toISOString(),
-    };
-
-    this.servicios.push(nuevoServicio);
-
-    return nuevoServicio;
+    return this.prisma.servicio.create({
+      data: {
+        nombre: dto.nombre,
+        duracion: dto.duracion,
+        precio: dto.precio,
+        descripcion: dto.descripcion,
+      },
+    });
   }
 
-  findAll(): Servicio[] {
-    return this.servicios;
+  async findAll() {
+
+    return this.prisma.servicio.findMany({
+      orderBy: {
+        id: 'asc',
+      },
+    });
   }
 
-  findOne(id: number): Servicio {
+  async findOne(id: number) {
 
-    const servicio = this.servicios.find(s => s.id === id);
+    const servicio =
+      await this.prisma.servicio.findUnique({
+        where: { id },
+      });
 
     if (!servicio) {
-      throw new NotFoundException(`Servicio ${id} no existe`);
+      throw new NotFoundException(
+        `Servicio ${id} no existe`,
+      );
     }
 
     return servicio;
   }
 
-  update(id: number, dto: UpdateServicioDto): Servicio {
+  async update(
+    id: number,
+    dto: UpdateServicioDto,
+  ) {
 
-    const servicio = this.findOne(id);
+    await this.findOne(id);
 
-    Object.assign(servicio, dto);
-
-    return servicio;
+    return this.prisma.servicio.update({
+      where: { id },
+      data: dto,
+    });
   }
 
-  remove(id: number): void {
+  async remove(id: number) {
 
-    const index = this.servicios.findIndex(s => s.id === id);
+    await this.findOne(id);
 
-    if (index === -1) {
-      throw new NotFoundException(`Servicio ${id} no existe`);
-    }
-
-    this.servicios.splice(index, 1);
+    return this.prisma.servicio.delete({
+      where: { id },
+    });
   }
 }

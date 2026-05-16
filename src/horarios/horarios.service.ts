@@ -1,42 +1,72 @@
-import { Injectable, NotFoundException } from '@nestjs/common';
+import {
+  Injectable,
+  NotFoundException,BadRequestException,
+} from '@nestjs/common';
+
+import { PrismaService } from '../prisma/prisma.service';
 
 import { CreateHorarioDto } from './dto/create-horario.dto';
 import { UpdateHorarioDto } from './dto/update-horario.dto';
 
-import { Horario } from './entities/horario.entity';
-
 @Injectable()
 export class HorariosService {
 
-  private horarios: Horario[] = [];
-  private nextId = 1;
+  constructor(
+    private readonly prisma: PrismaService,
+  ) {}
 
-  create(dto: CreateHorarioDto): Horario {
+async create(dto: CreateHorarioDto) {
 
-    const nuevoHorario: Horario = {
-      id: this.nextId++,
-      barberoId: dto.barberoId,
+  const existeHorario =
+    await this.prisma.horario.findFirst({
+      where: {
+        barberoId: dto.barberoId,
+        dia: dto.dia,
+        horaInicio: dto.horaInicio,
+        horaFin: dto.horaFin,
+      },
+    });
+
+  if (existeHorario) {
+    throw new BadRequestException(
+      'Ese horario ya existe para el barbero',
+    );
+  }
+
+  return this.prisma.horario.create({
+    data: {
       dia: dto.dia,
       horaInicio: dto.horaInicio,
       horaFin: dto.horaFin,
       disponible: dto.disponible,
-      createdAt: new Date().toISOString(),
-    };
+      barberoId: dto.barberoId,
+    },
+  });
+}
 
-    this.horarios.push(nuevoHorario);
+  async findAll() {
 
-    return nuevoHorario;
+    return this.prisma.horario.findMany({
+      include: {
+        barbero: true,
+      },
+
+      orderBy: {
+        id: 'asc',
+      },
+    });
   }
 
-  findAll(): Horario[] {
-    return this.horarios;
-  }
+  async findOne(id: number) {
 
-  findOne(id: number): Horario {
+    const horario =
+      await this.prisma.horario.findUnique({
+        where: { id },
 
-    const horario = this.horarios.find(
-      h => h.id === id,
-    );
+        include: {
+          barbero: true,
+        },
+      });
 
     if (!horario) {
       throw new NotFoundException(
@@ -47,30 +77,26 @@ export class HorariosService {
     return horario;
   }
 
-  update(
+  async update(
     id: number,
     dto: UpdateHorarioDto,
-  ): Horario {
+  ) {
 
-    const horario = this.findOne(id);
+    await this.findOne(id);
 
-    Object.assign(horario, dto);
+    return this.prisma.horario.update({
+      where: { id },
 
-    return horario;
+      data: dto,
+    });
   }
 
-  remove(id: number): void {
+  async remove(id: number) {
 
-    const index = this.horarios.findIndex(
-      h => h.id === id,
-    );
+    await this.findOne(id);
 
-    if (index === -1) {
-      throw new NotFoundException(
-        `Horario ${id} no existe`,
-      );
-    }
-
-    this.horarios.splice(index, 1);
+    return this.prisma.horario.delete({
+      where: { id },
+    });
   }
 }
